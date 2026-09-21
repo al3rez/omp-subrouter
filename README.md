@@ -1,0 +1,114 @@
+# omp-subrouter
+
+Route [**omp** (oh-my-pi)](https://omp.sh) through a local [**manaflow-ai/subrouter**](https://github.com/manaflow-ai/subrouter) daemon.
+
+Subrouter is a local proxy that pools multiple **Claude Max** / **ChatGPT Pro** subscriptions (and API keys) behind one endpoint, with sticky, rate-limit-aware account selection. This plugin registers that endpoint as native omp providers, so you can pick a pooled model straight from omp's model selector — no per-tool logins, no manual `models.yml` edits.
+
+```
+subrouter/claude-opus-4-8        → Claude Max pool   (Anthropic Messages API)
+subrouter-codex/gpt-5.2-codex    → ChatGPT pool      (Codex Responses API)
+```
+
+## Requirements
+
+- omp `>= 18`
+- A running subrouter daemon with at least one account added.
+
+## Install
+
+### A. omp marketplace (recommended)
+
+```
+omp plugin marketplace add al3rez/omp-subrouter
+omp plugin install subrouter@omp-subrouter
+```
+
+Then restart omp (extension modules load at session start). From inside a session you can also run `/marketplace add al3rez/omp-subrouter` and `/marketplace install subrouter@omp-subrouter`.
+
+### B. One file, no marketplace
+
+Drop the extension into your agent directory — omp auto-discovers `~/.omp/agent/extensions/*.ts`:
+
+```bash
+mkdir -p ~/.omp/agent/extensions
+curl -fsSL https://raw.githubusercontent.com/al3rez/omp-subrouter/main/plugins/subrouter/extension/subrouter.ts \
+  -o ~/.omp/agent/extensions/subrouter.ts
+```
+
+On Windows (PowerShell):
+
+```powershell
+mkdir "$env:USERPROFILE\.omp\agent\extensions" -Force
+curl -fsSL https://raw.githubusercontent.com/al3rez/omp-subrouter/main/plugins/subrouter/extension/subrouter.ts `
+  -o "$env:USERPROFILE\.omp\agent\extensions\subrouter.ts"
+```
+
+> Use **either** A or B, not both — two copies would register the same providers twice.
+
+## Set up subrouter
+
+```bash
+npm i -g subrouter            # or: pipx install subrouter
+subrouter serve --addr 127.0.0.1:31415   # keep this running
+sr add claude work            # add a Claude Max subscription (repeat as needed)
+sr add                        # add a Codex / ChatGPT account (optional)
+sr status                     # verify the pool
+```
+
+macOS/Linux users can install subrouter as a background service instead
+(`sr install-daemon` / `sr install-systemd`); on Windows run `subrouter serve`
+yourself (a scheduled task or a terminal tab works).
+
+## Use
+
+```bash
+omp --model subrouter/claude-opus-4-8
+# or pick any subrouter/… model from the selector
+```
+
+Registered models:
+
+| Provider          | Models                                                                    | Wire API                 |
+| ----------------- | ------------------------------------------------------------------------- | ------------------------ |
+| `subrouter`       | `claude-opus-5`, `claude-opus-4-8`, `claude-sonnet-5`, `claude-sonnet-4-5`, `claude-haiku-4-5` | `anthropic-messages`     |
+| `subrouter-codex` | `gpt-5.2-codex`, `gpt-5.1-codex-max`, `gpt-5.1-codex`, `gpt-5-codex`       | `openai-codex-responses` |
+
+Pricing is inherited from omp's built-in catalog (each model omits an explicit
+`cost`, so the matching catalog card is used).
+
+## Configuration
+
+| Env var        | Default                  | Purpose                                  |
+| -------------- | ------------------------ | ---------------------------------------- |
+| `SUBROUTER_URL` | `http://127.0.0.1:31415` | Subrouter daemon root (local or remote). |
+
+A trailing `/` or `/v1` on `SUBROUTER_URL` is tolerated.
+
+## How it works
+
+The extension calls omp's `pi.registerProvider()` for two dedicated providers
+(it does **not** hijack your built-in `anthropic` / `openai`):
+
+- **Claude pool** → `POST {SUBROUTER_URL}/v1/messages`, header `X-Subrouter-Agent: claude`.
+- **Codex pool** → `POST {SUBROUTER_URL}/backend-api/codex/responses`, header `X-Subrouter-Agent: codex` (this is subrouter's `chatgpt_base_url` surface).
+
+The local hop authenticates with the non-secret placeholder token `subrouter`
+(sent as `Authorization: Bearer subrouter`); subrouter swaps in the real pooled
+account before forwarding upstream. If the daemon is unreachable, omp logs a
+one-line hint at startup and only the `subrouter/*` models fail — your other
+providers are untouched.
+
+## Troubleshooting
+
+- **`subrouter/*` models error / connection refused** — the daemon isn't
+  running. Start `subrouter serve --addr 127.0.0.1:31415` and check
+  `curl http://127.0.0.1:31415/_subrouter/health`.
+- **Models don't appear after marketplace install** — restart omp; extension
+  modules load at session start (`/reload-plugins` refreshes skills/commands but
+  not new extensions).
+- **Remote subrouter** — set `SUBROUTER_URL=http://<host>:31415` in omp's
+  environment.
+
+## License
+
+MIT © Alireza Bashiri. Not affiliated with manaflow-ai or oh-my-pi.

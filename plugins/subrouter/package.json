@@ -1,0 +1,27 @@
+{
+  "name": "omp-subrouter",
+  "version": "1.0.0",
+  "description": "Route omp through a local manaflow-ai/subrouter daemon (pooled Claude Max / ChatGPT subscriptions and API keys).",
+  "license": "MIT",
+  "author": "Alireza Bashiri <al3rez@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/al3rez/omp-subrouter.git"
+  },
+  "keywords": [
+    "omp",
+    "oh-my-pi",
+    "subrouter",
+    "manaflow",
+    "claude",
+    "codex",
+    "provider",
+    "proxy"
+  ],
+  "type": "module",
+  "omp": {
+    "extensions": [
+      "./extension/subrouter.ts"
+    ]
+  }
+}

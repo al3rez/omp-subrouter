@@ -1,0 +1,37 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "omp-subrouter",
+  "owner": {
+    "name": "Alireza Bashiri",
+    "email": "al3rez@gmail.com"
+  },
+  "metadata": {
+    "description": "Route omp through a local manaflow-ai/subrouter daemon (pooled Claude Max / ChatGPT subscriptions).",
+    "version": "1.0.0",
+    "pluginRoot": "plugins"
+  },
+  "plugins": [
+    {
+      "name": "subrouter",
+      "source": "./subrouter",
+      "description": "Registers subrouter's Claude and Codex pools as omp providers so you can route omp through your pooled subscriptions.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Alireza Bashiri",
+        "email": "al3rez@gmail.com"
+      },
+      "homepage": "https://github.com/al3rez/omp-subrouter",
+      "repository": "https://github.com/al3rez/omp-subrouter",
+      "license": "MIT",
+      "keywords": [
+        "subrouter",
+        "manaflow",
+        "claude",
+        "codex",
+        "proxy",
+        "provider"
+      ],
+      "category": "development"
+    }
+  ]
+}
