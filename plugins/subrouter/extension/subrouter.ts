@@ -15,14 +15,41 @@
  *   sr add claude <name>         # add a Claude Max subscription (repeat as needed)
  *   sr add                       # add a Codex/ChatGPT account (optional)
  *
- * The local hop uses the non-secret placeholder token "subrouter"; the daemon
- * swaps in the real pooled account before forwarding upstream. Override the
- * endpoint with SUBROUTER_URL (default http://127.0.0.1:31415).
+ * The local hop normally uses the non-secret placeholder token "subrouter"; the
+ * daemon swaps in the real pooled account before forwarding upstream. A daemon
+ * started with --cloud-config instead requires that config's localProxyToken,
+ * which is resolved automatically. Override the endpoint with SUBROUTER_URL
+ * (default http://127.0.0.1:31415) and the token with SUBROUTER_TOKEN.
  */
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
-// Non-secret local-hop token, per subrouter's documented Codex/Claude wiring.
-const LOCAL_TOKEN = "subrouter";
+/** Non-secret local-hop token accepted by a plain `subrouter serve`. */
+const PLACEHOLDER_TOKEN = "subrouter";
+
+/**
+ * Resolve the token the daemon expects.
+ *
+ * A plain daemon accepts anything, but one started with --cloud-config rejects
+ * every request that does not carry its localProxyToken, so fall back to that
+ * file before using the placeholder.
+ */
+function subrouterToken(): string {
+  const fromEnv = process.env.SUBROUTER_TOKEN?.trim();
+  if (fromEnv) return fromEnv;
+
+  try {
+    const cloudConfig = join(homedir(), ".config", "subrouter", "cloud.json");
+    const token = JSON.parse(readFileSync(cloudConfig, "utf-8"))?.localProxyToken;
+    if (typeof token === "string" && token.trim()) return token.trim();
+  } catch {
+    // No cloud config, or it is unreadable: the daemon is not cloud-gated.
+  }
+
+  return PLACEHOLDER_TOKEN;
+}
 
 /** Resolve the subrouter root, tolerating a trailing slash or a "/v1" suffix. */
 function subrouterRoot(): string {
@@ -74,13 +101,14 @@ function toModel(m: ModelSpec) {
 
 export default function subrouter(pi: ExtensionAPI): void {
   const root = subrouterRoot();
+  const token = subrouterToken();
 
   try {
     // Claude Max pool — Anthropic base; omp appends /v1/messages itself.
     pi.registerProvider("subrouter", {
       name: "Subrouter · Claude pool",
       baseUrl: root,
-      apiKey: LOCAL_TOKEN,
+      apiKey: token,
       api: "anthropic-messages",
       headers: { "X-Subrouter-Agent": "claude" },
       models: CLAUDE_MODELS.map(toModel),
@@ -91,7 +119,7 @@ export default function subrouter(pi: ExtensionAPI): void {
     pi.registerProvider("subrouter-codex", {
       name: "Subrouter · Codex pool",
       baseUrl: `${root}/backend-api`,
-      apiKey: LOCAL_TOKEN,
+      apiKey: token,
       api: "openai-codex-responses",
       headers: { "X-Subrouter-Agent": "codex" },
       models: CODEX_MODELS.map(toModel),

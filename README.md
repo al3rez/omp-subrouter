@@ -78,9 +78,10 @@ Pricing is inherited from omp's built-in catalog (each model omits an explicit
 
 ## Configuration
 
-| Env var        | Default                  | Purpose                                  |
-| -------------- | ------------------------ | ---------------------------------------- |
-| `SUBROUTER_URL` | `http://127.0.0.1:31415` | Subrouter daemon root (local or remote). |
+| Env var          | Default                  | Purpose                                  |
+| ---------------- | ------------------------ | ---------------------------------------- |
+| `SUBROUTER_URL`   | `http://127.0.0.1:31415` | Subrouter daemon root (local or remote). |
+| `SUBROUTER_TOKEN` | auto-detected            | Bearer token for the local hop. Only needed to override detection. |
 
 A trailing `/` or `/v1` on `SUBROUTER_URL` is tolerated.
 
@@ -94,15 +95,34 @@ The extension calls omp's `pi.registerProvider()` for two dedicated providers
 
 The local hop authenticates with the non-secret placeholder token `subrouter`
 (sent as `Authorization: Bearer subrouter`); subrouter swaps in the real pooled
-account before forwarding upstream. If the daemon is unreachable, omp logs a
-one-line hint at startup and only the `subrouter/*` models fail — your other
-providers are untouched.
+account before forwarding upstream.
+
+A daemon started with `--cloud-config` is different: it rejects every request
+that does not carry that config's `localProxyToken`, so the placeholder gets a
+bare `401 unauthorized`. The extension therefore resolves the token as:
+
+1. `SUBROUTER_TOKEN`, when set
+2. `localProxyToken` from `~/.config/subrouter/cloud.json`, when that file exists
+3. the `subrouter` placeholder
+
+The token is read at session start and never written anywhere.
+
+If the daemon is unreachable, omp logs a one-line hint at startup and only the
+`subrouter/*` models fail — your other providers are untouched.
 
 ## Troubleshooting
 
 - **`subrouter/*` models error / connection refused** — the daemon isn't
   running. Start `subrouter serve --addr 127.0.0.1:31415` and check
   `curl http://127.0.0.1:31415/_subrouter/health`.
+- **`subrouter/*` models return 401 `unauthorized`** — the daemon is running
+  with `--cloud-config` and wants its `localProxyToken`. That is picked up from
+  `~/.config/subrouter/cloud.json` automatically; set `SUBROUTER_TOKEN`
+  explicitly if your config lives elsewhere.
+- **`subrouter-codex/*` returns `400 ... model is not supported when using
+  Codex with a ChatGPT account`** — upstream entitlement, not routing. Confirm
+  with `sr status` that a Codex account is `active` and not `cooked`; the same
+  error reproduces with a direct `curl` to the daemon.
 - **Models don't appear after marketplace install** — restart omp; extension
   modules load at session start (`/reload-plugins` refreshes skills/commands but
   not new extensions).
