@@ -81,11 +81,16 @@ const CLAUDE_MODELS: ModelSpec[] = [
 ];
 
 // Codex ids subrouter forwards to a ChatGPT account via the Responses wire.
+// The gpt-5.x-codex ids were retired: the ChatGPT backend now answers them with
+// `400 ... model is not supported when using Codex with a ChatGPT account`.
 const CODEX_MODELS: ModelSpec[] = [
-  { id: "gpt-5.2-codex", name: "GPT-5.2 Codex · Subrouter", reasoning: true, contextWindow: 272_000, maxTokens: 128_000 },
-  { id: "gpt-5.1-codex-max", name: "GPT-5.1 Codex Max · Subrouter", reasoning: true, contextWindow: 272_000, maxTokens: 128_000 },
-  { id: "gpt-5.1-codex", name: "GPT-5.1 Codex · Subrouter", reasoning: true, contextWindow: 272_000, maxTokens: 128_000 },
-  { id: "gpt-5-codex", name: "GPT-5 Codex · Subrouter", reasoning: true, contextWindow: 272_000, maxTokens: 128_000 },
+  { id: "gpt-6-sol", name: "GPT-6 Sol · Subrouter", reasoning: true, contextWindow: 1_100_000, maxTokens: 128_000 },
+  { id: "gpt-6-astra", name: "GPT-6 Astra · Subrouter", reasoning: true, contextWindow: 1_100_000, maxTokens: 128_000 },
+  { id: "gpt-6-luna", name: "GPT-6 Luna · Subrouter", reasoning: true, contextWindow: 1_100_000, maxTokens: 128_000 },
+  { id: "gpt-5.6-sol", name: "GPT-5.6 Sol · Subrouter", reasoning: true, contextWindow: 1_100_000, maxTokens: 128_000 },
+  { id: "gpt-5.6-luna", name: "GPT-5.6 Luna · Subrouter", reasoning: true, contextWindow: 1_100_000, maxTokens: 128_000 },
+  { id: "gpt-5.6-terra", name: "GPT-5.6 Terra · Subrouter", reasoning: true, contextWindow: 1_100_000, maxTokens: 128_000 },
+  { id: "gpt-5.5", name: "GPT-5.5 · Subrouter", reasoning: true, contextWindow: 1_100_000, maxTokens: 128_000 },
 ];
 
 function toModel(m: ModelSpec) {
@@ -116,6 +121,13 @@ export default function subrouter(pi: ExtensionAPI): void {
 
     // ChatGPT pool — omp's openai-codex-responses posts to {baseUrl}/codex/responses,
     // which subrouter serves under its ChatGPT backend base (/backend-api).
+    //
+    // Known limitation: the ChatGPT backend gates model availability on the
+    // `version` header (the Codex client version). omp's codex transport sets
+    // it to 0.153.0 and overwrites any provider header, so current model ids
+    // come back as 400 "model is not supported when using Codex with a ChatGPT
+    // account". The same request with version 0.156.1 succeeds. Until omp
+    // advertises a current version, use `sr codex` for the ChatGPT pool.
     pi.registerProvider("subrouter-codex", {
       name: "Subrouter · Codex pool",
       baseUrl: `${root}/backend-api`,

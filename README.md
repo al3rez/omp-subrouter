@@ -6,7 +6,7 @@ Subrouter is a local proxy that pools multiple **Claude Max** / **ChatGPT Pro** 
 
 ```
 subrouter/claude-opus-4-8        → Claude Max pool   (Anthropic Messages API)
-subrouter-codex/gpt-5.2-codex    → ChatGPT pool      (Codex Responses API)
+subrouter-codex/gpt-6-sol        → ChatGPT pool      (Codex Responses API)
 ```
 
 ## Requirements
@@ -71,7 +71,7 @@ Registered models:
 | Provider          | Models                                                                    | Wire API                 |
 | ----------------- | ------------------------------------------------------------------------- | ------------------------ |
 | `subrouter`       | `claude-opus-5`, `claude-opus-4-8`, `claude-sonnet-5`, `claude-sonnet-4-5`, `claude-haiku-4-5` | `anthropic-messages`     |
-| `subrouter-codex` | `gpt-5.2-codex`, `gpt-5.1-codex-max`, `gpt-5.1-codex`, `gpt-5-codex`       | `openai-codex-responses` |
+| `subrouter-codex` | `gpt-6-sol`, `gpt-6-astra`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.5` | `openai-codex-responses` |
 
 Pricing is inherited from omp's built-in catalog (each model omits an explicit
 `cost`, so the matching catalog card is used).
@@ -120,9 +120,13 @@ If the daemon is unreachable, omp logs a one-line hint at startup and only the
   `~/.config/subrouter/cloud.json` automatically; set `SUBROUTER_TOKEN`
   explicitly if your config lives elsewhere.
 - **`subrouter-codex/*` returns `400 ... model is not supported when using
-  Codex with a ChatGPT account`** — upstream entitlement, not routing. Confirm
-  with `sr status` that a Codex account is `active` and not `cooked`; the same
-  error reproduces with a direct `curl` to the daemon.
+  Codex with a ChatGPT account`** — the ChatGPT backend gates model
+  availability on the `version` header (the Codex client version). omp 18.2.8
+  sends `version: 0.153.0` and its codex transport overwrites any provider
+  header, so no model id in the table currently resolves. The identical request
+  with `version: 0.156.1` returns 200, so this is an omp-side limitation, not a
+  subrouter or account problem. Use `sr codex` for the ChatGPT pool until omp
+  advertises a current Codex version. The Claude pool is unaffected.
 - **Models don't appear after marketplace install** — restart omp; extension
   modules load at session start (`/reload-plugins` refreshes skills/commands but
   not new extensions).
